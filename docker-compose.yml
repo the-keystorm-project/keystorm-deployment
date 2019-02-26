@@ -1,0 +1,64 @@
+version: '3.3'
+services:
+  keystorm:
+    image: keystorm/keystorm:${KEYSTORM_KEYSTORM_VERSION:?"Missing keystorm Docker image version"}
+    command: ["-e",  "production"]
+    environment:
+      HOST: 0.0.0.0
+      ONE_AUTH: /run/secrets/keystorm-opennebula-auth
+      KEYSTORM_OPENNEBULA_ENDPOINT: ${KEYSTORM_OPENNEBULA_ENDPOINT:?"Missing OpenNebula endpoint"}
+      KEYSTORM_MEMCACHE: memcached:11211
+      KEYSTORM_ENDPOINT: ${KEYSTORM_KEYSTORM_ENDPOINT:?"Missing Keystorm endpoint"}
+      KEYSTORM_EXPIRATION_WINDOW: ${KEYSTORM_EXPIRATION_WINDOW:-28800}
+      KEYSTORM_TOKEN_CIPHER_FILE: /run/secrets/keystorm-token-cipher
+      KEYSTORM_TOKEN_KEY_FILE: /run/secrets/keystorm-token-key
+      KEYSTORM_TOKEN_IV_FILE: /run/secrets/keystorm-token-iv
+      KEYSTORM_ENCRYPT_SCOPED_TOKEN: "false"
+      RAILS_LOG_TO_STDOUT: "yes"
+      KEYSTORM_LOG_LEVEL: ${KEYSTORM_DEBUG:-info}
+    depends_on:
+      - memcached
+    secrets:
+      - keystorm-opennebula-auth
+      - keystorm-token-cipher
+      - keystorm-token-key
+      - keystorm-token-iv
+  apache:
+    image: keystorm/apache-keystorm:${KEYSTORM_APACHE_KEYSTORM_VERSION:?"Missing apache keystorm Docker image version"}
+    ports:
+      - "5000:5000"
+    environment:
+      APACHE_HOST: "*"
+      APACHE_PORT: 5000
+      APACHE_LOG_ERROR: /dev/stderr
+      APACHE_LOG_ACCESS: /dev/stdout
+      APACHE_PROXY: http://keystorm:3000
+      APACHE_OIDC_METADATA_URL: ${KEYSTORM_OIDC_METADATA_URL:?"Missing OIDC metadata URL"}
+      APACHE_OIDC_CLIENT_ID: ${KEYSTORM_OIDC_CLIENT_ID:?"Missing OIDC client ID"}
+      APACHE_OIDC_INTROSPECTION_ENDPOINT: ${KEYSTORM_OIDC_INTROSPECTION_ENDPOINT:?"Missing OIDC introspection endpoint"}
+      APACHE_OIDC_REDIRECT_URI: http://apache/v3/auth/OS-FEDERATION/websso/oidc/redirect
+      VOMS_CONFIGURATION: ${KEYSTORM_VOMS_CONFIGURATION:?"Missing VOMS configuration"}
+      APACHE_OIDC_CLIENT_SECRET_FILE: /run/secrets/apache-keystorm-oidc-client-secret
+      APACHE_OIDC_CRYPTO_PASSPHRASE_FILE: /run/secrets/apache-keystorm-oidc-crypto-passphrase
+      DEBUG: ${KEYSTORM_DEBUG}
+    secrets:
+      - apache-keystorm-oidc-client-secret
+      - apache-keystorm-oidc-crypto-passphrase
+    depends_on:
+      - keystorm
+  memcached:
+    image: memcached:latest
+
+secrets:
+  apache-keystorm-oidc-client-secret:
+    external: true
+  apache-keystorm-oidc-crypto-passphrase:
+    external: true
+  keystorm-opennebula-auth:
+    external: true
+  keystorm-token-cipher:
+    external: true
+  keystorm-token-key:
+    external: true
+  keystorm-token-iv:
+    external: true
